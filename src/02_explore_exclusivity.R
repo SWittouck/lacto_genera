@@ -9,7 +9,7 @@ dout <- "results/exclusivity"
 if (! dir.exists(dout)) dir.create(dout, recursive = T)
 
 # load data
-load("parsed/legen_v3_3_repr_withpairs.rda")
+load("results/parsed/legen_v3_3_repr_withpairs.rda")
 
 # determine exclusivity
 translate <- function(x, from, to) {

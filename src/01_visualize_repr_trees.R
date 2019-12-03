@@ -10,9 +10,9 @@ if (! dir.exists(dout)) dir.create(dout, recursive = T)
 dout_paper <- "results/genus_taxonomy_paper"
 if (! dir.exists(dout_paper)) dir.create(dout_paper, recursive = T)
 
-load("parsed/legen_v3_3_repr_tree_protein.rda")
-load("parsed/legen_v3_3_repr_tree_dna.rda")
-load("parsed/legen_v3_3_repr_tree_gc.rda")
+load("results/parsed/legen_v3_3_repr_tree_protein.rda")
+load("results/parsed/legen_v3_3_repr_tree_dna.rda")
+load("results/parsed/legen_v3_3_repr_tree_gc.rda")
 
 # write table with phylogroup membership of species
 species <-

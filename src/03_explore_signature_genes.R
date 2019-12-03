@@ -11,7 +11,7 @@ dout_paper <- "results/genus_taxonomy_paper"
 if (! dir.exists(dout_paper)) dir.create(dout_paper, recursive = T)
 
 # load data
-load("parsed/legen_v3_3_repr_withpairs.rda")
+load("results/parsed/legen_v3_3_repr_withpairs.rda")
 
 # add and map pres/abs patterns
 lgc_repr_v3_3_withpairs <- 
@@ -22,12 +22,23 @@ lgc_repr_v3_3_withpairs <-
   add_patterns() %>%
   map_patterns()
 
+# type species of phylogroups 
+phylogroups_types <-
+  lgc_repr_v3_3_withpairs$genomes %>%
+  filter(is_phylogroup_type) %>%
+  left_join(lgc_repr_v3_3_withpairs$nodes) %>%
+  select(phylogroup, type_species = species)
+
 # number of genomes and signature genes per phylogroup
 lgc_repr_v3_3_withpairs$nodes %>%
   filter(is_phylogroup_ancestor) %>%
   left_join(lgc_repr_v3_3_withpairs$phylogroups) %>%
   left_join(lgc_repr_v3_3_withpairs$patterns) %>%
-  select(phylogroup, n_species = pg_genomes, n_signature_genes = frequency) %>%
+  left_join(phylogroups_types) %>%
+  select(
+    phylogroup, type_species, n_species = pg_genomes, 
+    n_signature_genes = frequency
+  ) %>%
   mutate(n_signature_genes = if_else(
     is.na(n_signature_genes) & n_species > 1, 0L, n_signature_genes
   )) %>%
