@@ -5,32 +5,57 @@ library(tidyverse)
 library(tidygenomes)
 library(ggtree)
 
+source("src/functions.R")
+
 dout <- "results/trees_and_phylogroups"
 if (! dir.exists(dout)) dir.create(dout, recursive = T)
 dout_paper <- "results/genus_taxonomy_paper"
 if (! dir.exists(dout_paper)) dir.create(dout_paper, recursive = T)
 
-load("results/parsed/legen_v3_3_repr_tree_protein.rda")
-load("results/parsed/legen_v3_3_repr_tree_dna.rda")
-load("results/parsed/legen_v3_3_repr_tree_gc.rda")
+# import data 
+genomes_clusters <- read_csv("data/legen_v3_4/genomes_clusters.csv")
+clusters_species <- read_csv("results/parsed/clusters_all_named_adapted.csv")
+outgroups <- read_tsv(
+  "data/legen_v3_4/outgroup_genomes.tsv", col_names = c("genome", "species")
+)
+tree_dna <- ape::read.tree("data/legen_v3_4/lacto_dna.treefile")
+tree_protein <- ape::read.tree("data/legen_v3_4/lacto_protein.treefile")
+tree_gc <- ape::read.tree("data/legen_v3_4/lacto_gc.treefile")
+phylogroups <- read_csv("data/lactobacillaceae_genera_2019.csv")
+
+# preprocess genomes and add outgroups
+genomes <- 
+  genomes_clusters %>%
+  left_join(clusters_species) %>%
+  bind_rows(outgroups)
+
+# define the root location of the tree
+root_location <- c(
+  "Lactobacillus casei", "Listeria monocytogenes", 
+  "Brochothrix thermosphacta"
+)
+
+# construct tidygenomes object per type of tree (protein, dna, gene content)
+lgc_protein <- prepare_tidygenomes(genomes, tree_protein, root_location)
+lgc_dna <- prepare_tidygenomes(genomes, tree_dna, root_location)
+lgc_gc <- prepare_tidygenomes(genomes, tree_gc, root_location)
+save(lgc_protein, file = "results/parsed/lgc_protein.rda")
 
 # write table with phylogroup membership of species
 species <-
   full_join(
-    lgc_repr_v3_3_protein_tree$genomes %>% 
-      left_join(lgc_repr_v3_3_protein_tree$nodes),
-    lgc_repr_v3_3_gc_tree$genomes %>% 
-      left_join(lgc_repr_v3_3_gc_tree$nodes),
+    lgc_protein$genomes %>% left_join(lgc_protein$nodes),
+    lgc_gc$genomes %>% left_join(lgc_gc$nodes),
     by = "species",
     suffix = c("_protein", "_gc")
   ) %>% 
-    select(species, phylogroup_protein, phylogroup_gc) %>%
-    mutate(same_phylogroup = phylogroup_protein == phylogroup_gc) 
+  select(species, phylogroup_protein, phylogroup_gc) %>%
+  mutate(same_phylogroup = phylogroup_protein == phylogroup_gc) 
 write_csv(species, path = paste0(dout, "/species_phylogroups.csv"))
 
 # visualize full trees
 ggtree_augmented(
-  lgc_repr_v3_3_protein_tree, layout = "rectangular", col = "grey"
+  lgc_protein, layout = "rectangular", col = "grey"
   ) +
   geom_tiplab(aes(label = species, col = is_phylogroup_type)) +
   geom_nodelab(aes(label = node_label)) +
@@ -41,7 +66,7 @@ ggsave(
   units = "cm", width = 40, height = 100
 )
 ggtree_augmented(
-  lgc_repr_v3_3_dna_tree, layout = "rectangular", col = "grey"
+  lgc_dna, layout = "rectangular", col = "grey"
   ) +
   geom_tiplab(aes(label = species, col = is_phylogroup_type)) +
   geom_nodelab(aes(label = node_label)) +
@@ -52,7 +77,7 @@ ggsave(
   units = "cm", width = 40, height = 100
 )
 ggtree_augmented(
-  lgc_repr_v3_3_gc_tree, layout = "rectangular", col = "grey"
+  lgc_gc, layout = "rectangular", col = "grey"
   ) +
   geom_tiplab(aes(label = species, col = is_phylogroup_type)) +
   geom_nodelab(aes(label = node_label)) +
@@ -67,22 +92,22 @@ ggsave(
 phylogroups_leuconostocaceae <- c(
   "Leuconostoc", "Weissella", "Fructobacillus", "Oenococcus", "Convivina"
 )
-lgc_repr_v3_3_protein_tree$phylogroups <-
-  lgc_repr_v3_3_protein_tree$phylogroups %>%
+lgc_protein$phylogroups <-
+  lgc_protein$phylogroups %>%
   mutate(family = case_when(
     phylogroup %in% phylogroups_leuconostocaceae ~ "Leuconostocaceae",
     TRUE ~ "Lactobacillaceae"
   ))
-lgc_repr_v3_3_protein_tree$genomes <-
-  lgc_repr_v3_3_protein_tree$genomes %>%
+lgc_protein$genomes <-
+  lgc_protein$genomes %>%
   mutate(fontface = if_else(is_phylogroup_type, "bold.italic", "italic")) 
-lgc_repr_v3_3_protein_tree$nodes <-
-  lgc_repr_v3_3_protein_tree$nodes %>%
+lgc_protein$nodes <-
+  lgc_protein$nodes %>%
   mutate(support_bs = str_extract(node_label, "[0-9]+$")) %>%
   mutate_at("support_bs", as.integer) 
-lgc_repr_v3_3_protein_tree$tree <-
-  lgc_repr_v3_3_protein_tree$tree %>% add_rootbranch()
-lgc_repr_v3_3_protein_tree %>%
+lgc_protein$tree <-
+  lgc_protein$tree %>% add_rootbranch()
+lgc_protein %>%
   ggtree_augmented(
     layout = "circular", col = "grey", size = 0.1
   ) +
@@ -102,26 +127,20 @@ ggsave(
 )
 
 # write table with genomes
-lgc_repr_v3_3_protein_tree$genomes %>%
-  left_join(lgc_repr_v3_3_protein_tree$nodes) %>%
-  left_join(lgc_repr_v3_3_protein_tree$phylogroups) %>%
+lgc_protein$genomes %>%
+  left_join(lgc_protein$nodes) %>%
+  left_join(lgc_protein$phylogroups) %>%
   select(assembly_accession = genome, species, phylogroup) %>%
   write_csv(paste0(dout_paper, "/table_S2_genomes.csv"))
 
 # create overview trees
-lgc_repr_v3_3_protein_tree_overview <-
-  lgc_repr_v3_3_protein_tree %>%
-  filter_genomes(is_phylogroup_type)
-lgc_repr_v3_3_dna_tree_overview <-
-  lgc_repr_v3_3_dna_tree %>%
-  filter_genomes(is_phylogroup_type)
-lgc_repr_v3_3_gc_tree_overview <-
-  lgc_repr_v3_3_gc_tree %>%
-  filter_genomes(is_phylogroup_type)
+lgc_protein_overview <- lgc_protein %>% filter_genomes(is_phylogroup_type)
+lgc_dna_overview <- lgc_dna %>% filter_genomes(is_phylogroup_type)
+lgc_gc_overview <- lgc_gc %>% filter_genomes(is_phylogroup_type)
 
 # visualize overview trees
 ggtree_augmented(
-  lgc_repr_v3_3_protein_tree_overview, layout = "rectangular", col = "grey"
+  lgc_protein_overview, layout = "rectangular", col = "grey"
   ) +
   geom_tiplab(aes(label = species)) +
   xlim(c(0, 1.8))
@@ -130,7 +149,7 @@ ggsave(
   units = "cm", width = 20, height = 15
 )
 ggtree_augmented(
-  lgc_repr_v3_3_dna_tree_overview, layout = "rectangular", col = "grey"
+  lgc_dna_overview, layout = "rectangular", col = "grey"
   ) +
   geom_tiplab(aes(label = species)) +
   xlim(c(0, 1.8))
@@ -139,7 +158,7 @@ ggsave(
   units = "cm", width = 20, height = 15
 )
 ggtree_augmented(
-  lgc_repr_v3_3_gc_tree_overview, layout = "rectangular", col = "grey"
+  lgc_gc_overview, layout = "rectangular", col = "grey"
   ) +
   geom_tiplab(aes(label = species)) +
   xlim(c(0, 0.03))
@@ -150,7 +169,7 @@ ggsave(
 
 # visualize genus taxonomy figure 7b
 ggtree_augmented(
-  lgc_repr_v3_3_protein_tree_overview, layout = "rectangular", col = "grey"
+  lgc_protein_overview, layout = "rectangular", col = "grey"
 ) +
   geom_tiplab(aes(label = species, col = family), align = T, offset = 0.05) +
   xlim(c(0, 2.2)) +
@@ -168,7 +187,7 @@ heterofermentative <-
     "W. viridescens", "O. oeni", "Leuc. mesenteroides", "C. intestini", 
     "F. fructosus"
   )
-lgc_repr_v3_3_protein_tree_overview %>%
+lgc_protein_overview %>%
   modify_at("nodes", mutate, support_bs = str_extract(node_label, "^[0-9]+") %>% as.integer()) %>%
   ggtree_augmented(col = "grey50") +
   geom_tiplab(aes(label = species_short, col = species_short %in% heterofermentative)) +
