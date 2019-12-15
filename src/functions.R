@@ -1,3 +1,11 @@
+#' Abbreviate LGS genus names
+#'
+#' This function abbreviates the genus names in species names of the
+#' Lactobacillus Genus Complex.
+#' 
+#' @param species A character vector of species names 
+#' 
+#' @return A character vector of abbreviated species names
 abbreviate_species <- function(species) {
   species %>%
     str_replace_all("Lactobacillus", "L.") %>%
@@ -67,8 +75,6 @@ root_tree.phylo <- function(tree, tips) {
 #'   given genomes
 #' 
 #' @return A tidygenomes object
-#' 
-#' @export
 root_tree <- function(tg, genomes, genome_identifier = genome) {
   
   if (! "tree" %in% names(tg)) {
@@ -94,11 +100,32 @@ root_tree <- function(tg, genomes, genome_identifier = genome) {
   
 }
 
+#' Translate elements of a character vector
+#'
+#' This function relaces the elements of a character vector using a translation
+#' table given by a "from" and a "to" vector.
+#' 
+#' @param x Character vector to translate
+#' @param from Character vector with unique elements to be replaced
+#' @param to Character vector with unique elements to replace the elements of
+#'   "from"
+#' 
+#' @return A translated character vector
 translate <- function(x, from, to) {
   lut <- structure(to, names = from)
   x <- lut[x] %>% unname()
 }
 
+#' Complement the pairs of a pair table
+#'
+#' For each unique pair of objects (a, b), the function adds a row for the pair
+#' (b, a) with the same information.
+#' 
+#' @param pairs Data frame where each row represents a pair of objects
+#' @param object_1 Variable defining the first object (unquoted)
+#' @param object_2 Variable defining the second object (unquoted)
+#' 
+#' @return A complemented table
 complete_pairs <- function(pairs, object_1, object_2) {
   
   object_1 <- rlang::enexpr(object_1)
@@ -113,13 +140,17 @@ complete_pairs <- function(pairs, object_1, object_2) {
   
 }
 
+#' Enrich genome pair table with genome metadata
+#'
+#' This function completes a genome pair table (see [complete_pairs]) and adds
+#' genome metadata supplied by a genome table.
+#' 
+#' @param genome_pairs Data frame containing the columns `genome_1` and
+#'   `genome_2`
+#' @param genomes Data frame containing the column `genome`
+#' 
+#' @return An enriched genome pair table
 enrich_genome_pairs <- function(genome_pairs, genomes) {
-  
-  singleton_phylogroups <-
-    genomes %>%
-    count(phylogroup, name = "n_species") %>%
-    filter(n_species == 1) %>%
-    pull(phylogroup)
   
   genome_pairs %>%
     complete_pairs(genome_1, genome_2) %>%
@@ -134,14 +165,18 @@ enrich_genome_pairs <- function(genome_pairs, genomes) {
         rename(genome_reference = genome, phylogroup_reference = phylogroup),
       by = "genome_reference"
     ) %>% 
-    mutate(same_phylogroup = phylogroup_query == phylogroup_reference) %>%
-    mutate(phylogroup_query = if_else(
-      phylogroup_query %in% singleton_phylogroups, "new genus", 
-      phylogroup_query
-    ))
+    mutate(same_phylogroup = phylogroup_query == phylogroup_reference) 
   
 }
 
+#' Return an extended genome pair table
+#'
+#' This function returns an extended genome pair table from a tidygenomes
+#' object, using the function [enrich_genome_pairs].
+#' 
+#' @param tg Tidygenomes object
+#' 
+#' @return An enriched genome pair table
 genome_pairs_extended <- function(tg) {
   
   genomes <-
@@ -153,58 +188,104 @@ genome_pairs_extended <- function(tg) {
   
 }
 
-classification_plot <- function(genome_pairs, similarity) {
+#' Plot the classification of genomes
+#'
+#' This function plots similarity values of query genomes to reference genomes,
+#' grouped per phylogroup/genus of the query genomes. Similarity values to
+#' reference genomes of the correct phylogroup are plotted in dark blue.
+#'
+#' @param genome_pairs A data frame containing the columns `genome_query`,
+#'   `phylogroup_query` and `same_phylogroup`
+#' @param similarity A genome-genome similarity expression
+#' @param genera_ordered An optional vector defining the order in which all
+#'   unique phylogroups/genera should appear in the plot
+#'
+#' @return A ggplot object
+classification_plot <- 
+  function(genome_pairs, similarity, genera_ordered = NULL) {
   
   similarity <- rlang::enexpr(similarity)
   
   genome_pairs %>%
     arrange(same_phylogroup) %>%
+    {if (! is.null(genera_ordered)) {
+      mutate_at(., "phylogroup_query", factor, levels = genera_ordered)
+    } else {
+      .
+    }} %>%
     ggplot(aes(x = !! similarity, y = genome_query, col = same_phylogroup)) +
-    geom_point(size = 0.1)+
-    facet_grid(rows = vars(phylogroup_query), scales = "free_y", space = "free_y") +
-    scale_color_brewer(palette = "Paired", name = "correct reference genus") +
+    geom_point(size = 0.1) +
+    facet_grid(
+      rows = vars(phylogroup_query), scales = "free_y"
+    ) +
+    scale_color_brewer(palette = "Paired", name = "own genus") +
     ylab("genome") +
     theme_bw() +
     theme(
       text = element_text(size = 8),
       axis.text.y = element_blank(),
       axis.ticks.y = element_blank(),
-      strip.text.y = element_text(angle = 0),
+      strip.text.y = element_text(angle = 0, face = "italic"),
       legend.position = "bottom"
     )
   
 }
 
-prepare_tidygenomes <- function(genomes, tree, root_location) {
-  
-  as_tidygenomes(genomes) %>%
-    add_tidygenomes(tree_protein) %>%
-    root_tree(genomes = root_location, genome_identifier = species) %>%
-    add_phylogroups(
-      phylogroups %>% rename(genome_type = species_type), 
-      genome_identifier = species_short
-    )
-  
-}
-
-classification_assessment <- function(genome_pairs_extended, similarity, min_value) {
+#' Filter top hits to reference phylogroups
+#'
+#' This function filters the similarity values of query genomes to reference
+#' genomes, to retain only the best hit of each query genome to each reference
+#' phylogroup.
+#'
+#' @param genome_pairs A data frame containing the columns `genome_query`,
+#'   `phylogroup_query` and `phylogroup_reference`
+#' @param similarity A genome-genome similarity expression
+#'
+#' @return A filtered genome pair table 
+filter_top_hit_per_phylogroup <- function(genome_pairs, similarity) {
   
   similarity <- rlang::enexpr(similarity)
   
-  genome_pairs_extended %>%
+  genome_pairs %>%
+    group_by(genome_query, phylogroup_query, phylogroup_reference) %>%
+    arrange(desc(!! similarity)) %>%
+    slice(1) %>%
+    ungroup() 
+  
+}
+
+#' Assess classification performance
+#'
+#' This function assesses the classification performance of a genome-genome
+#' similarity measure and a cutoff. It counts how many genomes had a reference
+#' genome of the correct genus/phylogroup to enable classification, and how many
+#' genomes were correctly classified, incorrectly classified or unclassified.
+#'
+#' When the best hit of a genome scores above the cutoff to a reference genus,
+#' it is classified to that genus. If it scores below the cutoff to all
+#' reference genera, it is considered "unclassified".
+#'
+#' @param genome_pairs A data frame containing the columns `genome_query`,
+#'   `phylogroup_query` and `phylogroup_reference`
+#' @param similarity A genome-genome similarity expression
+#' @param min_value A minimum cutoff similarity value for classification
+#'
+#' @return A genome count table
+classification_assessment <- function(genome_pairs, similarity, min_value) {
+  
+  similarity <- rlang::enexpr(similarity)
+  
+  genome_pairs %>%
     group_by(genome_query) %>%
+    mutate(classifiable = phylogroup_query[1] %in% phylogroup_reference) %>%
     arrange(desc(!! similarity)) %>%
     slice(1) %>%
     ungroup() %>%
-    mutate(genus_in_db = if_else(
-      phylogroup_query == "new genus", "no", "yes")
-    ) %>%
     mutate(classification_result = case_when(
       !! similarity < min_value ~ "unclassified",
       phylogroup_query == phylogroup_reference ~ "correctly classified",
       TRUE ~ "incorrectly classified"
     )) %>%
-    count(genus_in_db, classification_result)
+    count(classifiable, classification_result)
   
 }
-
