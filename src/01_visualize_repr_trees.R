@@ -30,15 +30,15 @@ genomes <-
   bind_rows(outgroups)
 
 # define the root location of the tree
-root_location <- c(
+root <- c(
   "Lactobacillus casei", "Listeria monocytogenes", 
   "Brochothrix thermosphacta"
 )
 
 # construct tidygenomes object per type of tree (protein, dna, gene content)
-lgc_protein <- prepare_tidygenomes(genomes, tree_protein, root_location)
-lgc_dna <- prepare_tidygenomes(genomes, tree_dna, root_location)
-lgc_gc <- prepare_tidygenomes(genomes, tree_gc, root_location)
+lgc_protein <- prepare_tidygenomes(genomes, tree_protein, phylogroups, root)
+lgc_dna <- prepare_tidygenomes(genomes, tree_dna, phylogroups, root)
+lgc_gc <- prepare_tidygenomes(genomes, tree_gc, phylogroups, root)
 save(lgc_protein, file = "results/parsed/lgc_protein.rda")
 
 # write table with phylogroup membership of species

@@ -70,12 +70,12 @@ root_tree.phylo <- function(tree, tips) {
 #' This applies [root_tree.phylo] to the tree component of a tidygenomes object.
 #' 
 #' @param tg An tidygenomes object
-#' @param genomes Three genomes
+#' @param root Three tips that identify the root (see [root_tree.phylo])
 #' @param genome_identifier Variable of the genome table that corresponds to the
 #'   given genomes
 #' 
 #' @return A tidygenomes object
-root_tree <- function(tg, genomes, genome_identifier = genome) {
+root_tree <- function(tg, root, genome_identifier = genome) {
   
   if (! "tree" %in% names(tg)) {
     stop("Tg should contain a tree")
@@ -86,7 +86,7 @@ root_tree <- function(tg, genomes, genome_identifier = genome) {
   tips <-
     tg$genomes %>%
     mutate(genome_identifier = !! genome_identifier) %>%
-    filter(genome_identifier %in% !! genomes) %>%
+    filter(genome_identifier %in% !! root) %>%
     left_join(tg$nodes, by = "node") %>%
     pull(node) 
   
@@ -97,6 +97,27 @@ root_tree <- function(tg, genomes, genome_identifier = genome) {
   tg$tree <- tg$tree %>% root_tree.phylo(tips) 
   
   tg
+  
+}
+
+#' Prepare tidygenomes object
+#'
+#' This function prepares a tidygenomes object from a genome table, a
+#' phylogenetic tree and a root location in the tree.
+#' 
+#' @param genomes A genome table with a column `genome`
+#' @param tree An object of class phylo with tips corresponding to genomes
+#' @param root Three tips that identify the root (see [root_tree.phylo])
+#' 
+#' @return A tidygenomes object
+prepare_tidygenomes <- function(genomes, tree, phylogroups, root) {
+  
+  phylogroups <- rename(phylogroups, genome_type = species_type)
+  
+  as_tidygenomes(genomes) %>%
+    add_tidygenomes(tree) %>%
+    root_tree(root, genome_identifier = species) %>%
+    add_phylogroups(phylogroups, genome_identifier = species_short)
   
 }
 
