@@ -15,13 +15,18 @@ if (! dir.exists(dout_paper)) dir.create(dout_paper, recursive = T)
 # import data 
 genomes_clusters <- read_csv("data/legen_v3_4/genomes_clusters.csv")
 clusters_species <- read_csv("results/parsed/clusters_all_named_adapted.csv")
-outgroups <- read_tsv(
-  "data/legen_v3_4/outgroup_genomes.tsv", col_names = c("genome", "species")
-)
+outgroups <- 
+  "data/legen_v3_4/outgroup_genomes.tsv" %>%
+  read_tsv(col_names = c("genome", "species")) %>%
+  mutate(species_short = species)
 tree_dna <- ape::read.tree("data/legen_v3_4/lacto_dna.treefile")
 tree_protein <- ape::read.tree("data/legen_v3_4/lacto_protein.treefile")
 tree_gc <- ape::read.tree("data/legen_v3_4/lacto_gc.treefile")
-phylogroups <- read_csv("data/lactobacillaceae_genera_2019.csv")
+# remark: we remove the phylogroup Acetilactobacillus because it's not present
+# in genome dataset 2
+phylogroups <- 
+  read_csv("data/lactobacillaceae_genera_2019.csv") %>%
+  filter(phylogroup != "Acetilactobacillus")
 
 # preprocess genomes and add outgroups
 genomes <- 
@@ -31,14 +36,27 @@ genomes <-
 
 # define the root location of the tree
 root <- c(
-  "Lactobacillus casei", "Listeria monocytogenes", 
+  "L. casei", "Listeria monocytogenes", 
   "Brochothrix thermosphacta"
 )
 
 # construct tidygenomes object per type of tree (protein, dna, gene content)
-lgc_protein <- prepare_tidygenomes(genomes, tree_protein, phylogroups, root)
-lgc_dna <- prepare_tidygenomes(genomes, tree_dna, phylogroups, root)
-lgc_gc <- prepare_tidygenomes(genomes, tree_gc, phylogroups, root)
+phylogroups <- rename(phylogroups, genome_type = species_type)
+lgc_protein <- 
+  prepare_tidygenomes(
+    genomes = genomes, tree = tree_protein, phylogroups = phylogroups, 
+    root = root, genome_identifier = species_short
+  )
+lgc_dna <- 
+  prepare_tidygenomes(
+    genomes = genomes, tree = tree_dna, phylogroups = phylogroups, 
+    root = root, genome_identifier = species_short
+  )
+lgc_gc <- 
+  prepare_tidygenomes(
+    genomes = genomes, tree = tree_gc, phylogroups = phylogroups, 
+    root = root, genome_identifier = species_short
+  )
 save(lgc_protein, file = "results/parsed/lgc_protein.rda")
 
 # write table with phylogroup membership of species
@@ -184,8 +202,8 @@ heterofermentative <-
   c(
     "L. buchneri", "L. fructivorans", "L. kunkeei", "L. brevis", 
     "L. malefermentans", "L. fermentum", "L. vaccinostercus", "L. rossiae",
-    "W. viridescens", "O. oeni", "Leuc. mesenteroides", "C. intestini", 
-    "F. fructosus"
+    "W. viridescens", "O. oeni", "Lc. mesenteroides", "C. intestini", 
+    "Fb. fructosus"
   )
 lgc_protein_overview %>%
   modify_at("nodes", mutate, support_bs = str_extract(node_label, "^[0-9]+") %>% as.integer()) %>%

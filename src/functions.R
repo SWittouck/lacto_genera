@@ -8,15 +8,11 @@
 #' @return A character vector of abbreviated species names
 abbreviate_species <- function(species) {
   species %>%
-    str_replace_all("Lactobacillus", "L.") %>%
-    str_replace_all("Pediococcus", "P.") %>%
     str_replace_all("Leuconostoc", "Lc.") %>%
-    str_replace_all("Oenococcus", "O.") %>%
     str_replace_all("Fructobacillus", "Fb.") %>%
-    str_replace_all("Weissella", "W.") %>%
-    str_replace_all("Convivina", "C.") %>%
     str_replace_all("Unassigned", "Unassig.") %>%
-    str_replace_all("pseudomesenteroides", "pseudomesent.")
+    str_replace_all("pseudomesenteroides", "pseudomesent.") %>%
+    str_replace("(?<=[A-Z])[a-z]+(?!\\.)", "\\.") 
 }
 
 #' Root tree given three tips
@@ -110,14 +106,20 @@ root_tree <- function(tg, root, genome_identifier = genome) {
 #' @param root Three tips that identify the root (see [root_tree.phylo])
 #' 
 #' @return A tidygenomes object
-prepare_tidygenomes <- function(genomes, tree, phylogroups, root) {
+prepare_tidygenomes <- function(
+    genomes, pangenome = NULL, tree = NULL, phylogroups = NULL, root = NULL, 
+    genome_identifier = genome
+  ) {
   
-  phylogroups <- rename(phylogroups, genome_type = species_type)
+  gi <- rlang::enexpr(genome_identifier)
   
   as_tidygenomes(genomes) %>%
-    add_tidygenomes(tree) %>%
-    root_tree(root, genome_identifier = species) %>%
-    add_phylogroups(phylogroups, genome_identifier = species_short)
+    {if (! is.null(pangenome)) add_tidygenomes(., pangenome) else .} %>%
+    {if (! is.null(tree)) add_tidygenomes(., tree) else .} %>%
+    {if (! is.null(root)) root_tree(., root, !! gi) else .} %>%
+    {
+      if (! is.null(phylogroups)) add_phylogroups(., phylogroups, !! gi) else .
+    }
   
 }
 
