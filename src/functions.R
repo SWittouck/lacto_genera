@@ -1,4 +1,4 @@
-#' Abbreviate LGS genus names
+#' Abbreviate LGC genus names
 #'
 #' This function abbreviates the genus names in species names of the
 #' Lactobacillus Genus Complex.
@@ -15,114 +15,6 @@ abbreviate_species <- function(species) {
     str_replace("(?<=[A-Z])[a-z]+(?!\\.)", "\\.") 
 }
 
-#' Root tree given three tips
-#'
-#' This function roots a phylogenetic tree given three tip labels.
-#'
-#' Tips a, b and c define exactly one internal node in the unrooted tree. The
-#' tree will be rooted on the branch leading from this node to tip a.
-#' 
-#' @param tree An object of class phylo
-#' @param tips Three tip labels 
-#' 
-#' @return An object of class phylo
-root_tree.phylo <- function(tree, tips) {
-  
-  if (! "phylo" %in% class(tree)) {
-    stop("tree should be of class phylo")
-  }
-  
-  # root on node defined by tips
-  root_new <- 
-    ape::mrca(tree) %>%
-    {.[tips, tips]} %>%
-    {.[. > length(tree$tip.label)]} %>%
-    {.[. == max(.)]} %>%
-    {.[1]}
-  tree <- tree %>% ape::root.phylo(node = root_new)
-  
-  # resolve root node such that first tip is (part of) outgroup
-  outgroup <-
-    ape::mrca(tree) %>%
-    {.[tips[1], ]} %>%
-    {.[. != length(tree$tip.label) + 1]} %>%
-    names()
-  tree <- tree %>% ape::root.phylo(outgroup = outgroup, resolve.root = T)
-  
-  # divide root branch length
-  if ("edge.length" %in% names(tree)) {
-    n_tips <- length(tree$tip.label) 
-    l <- sum(tree$edge.length[tree$edge[, 1] == n_tips + 1])
-    tree$edge.length[tree$edge[, 1] == n_tips + 1] <- l / 2
-  }
-  
-  # return tree
-  tree
-  
-}
-
-#' Root tree given three genomes
-#'
-#' This applies [root_tree.phylo] to the tree component of a tidygenomes object.
-#' 
-#' @param tg An tidygenomes object
-#' @param root Three tips that identify the root (see [root_tree.phylo])
-#' @param genome_identifier Variable of the genome table that corresponds to the
-#'   given genomes
-#' 
-#' @return A tidygenomes object
-root_tree <- function(tg, root, genome_identifier = genome) {
-  
-  if (! "tree" %in% names(tg)) {
-    stop("Tg should contain a tree")
-  }
-  
-  genome_identifier <- rlang::enexpr(genome_identifier)
-  
-  tips <-
-    tg$genomes %>%
-    mutate(genome_identifier = !! genome_identifier) %>%
-    filter(genome_identifier %in% !! root) %>%
-    left_join(tg$nodes, by = "node") %>%
-    pull(node) 
-  
-  if (! length(tips) == 3) {
-    stop("Not all nodes were found")
-  }
-  
-  tg$tree <- tg$tree %>% root_tree.phylo(tips) 
-  
-  tg
-  
-}
-
-#' Prepare tidygenomes object
-#'
-#' This function prepares a tidygenomes object from a genome table, a
-#' phylogenetic tree and a root location in the tree.
-#' 
-#' @param genomes A genome table with a column `genome`
-#' @param tree An object of class phylo with tips corresponding to genomes
-#' @param root Three tips that identify the root (see [root_tree.phylo])
-#' 
-#' @return A tidygenomes object
-prepare_tidygenomes <- function(
-    genomes, pangenome = NULL, tree = NULL, phylogroups = NULL, root = NULL, 
-    genome_identifier = genome
-  ) {
-  
-  gi <- rlang::enexpr(genome_identifier)
-  
-  as_tidygenomes(genomes) %>%
-    {if (! is.null(pangenome)) add_tidygenomes(., pangenome) else .} %>%
-    {if (! is.null(tree)) add_tidygenomes(., tree) else .} %>%
-    {if (! is.null(root)) root_tree(., root, !! gi) else .} %>%
-    {
-      if (! is.null(phylogroups)) add_phylogroups(., phylogroups, !! gi) else .
-    }
-  
-}
-
 #' Translate elements of a character vector
 #'
 #' This function relaces the elements of a character vector using a translation
@@ -137,30 +29,6 @@ prepare_tidygenomes <- function(
 translate <- function(x, from, to) {
   lut <- structure(to, names = from)
   x <- lut[x] %>% unname()
-}
-
-#' Complement the pairs of a pair table
-#'
-#' For each unique pair of objects (a, b), the function adds a row for the pair
-#' (b, a) with the same information.
-#' 
-#' @param pairs Data frame where each row represents a pair of objects
-#' @param object_1 Variable defining the first object (unquoted)
-#' @param object_2 Variable defining the second object (unquoted)
-#' 
-#' @return A complemented table
-complete_pairs <- function(pairs, object_1, object_2) {
-  
-  object_1 <- rlang::enexpr(object_1)
-  object_2 <- rlang::enexpr(object_2)
-  
-  pairs_2 <-
-    pairs %>%
-    rename(object_1_new = !! object_2, object_2_new = !! object_1) %>%
-    rename(!! object_1 := object_1_new, !! object_2 := object_2_new)
-  
-  bind_rows(pairs, pairs_2)
-  
 }
 
 #' Enrich genome pair table with genome metadata
