@@ -58,6 +58,13 @@ lgc_gc <-
     root = root, genome_identifier = species_short
   )
 save(lgc_protein, file = "results/parsed/lgc_protein.rda")
+lgc_protein %>%
+  {
+    .$tree$tip.label <- 
+      translate(.$tree$tip.label, from = .$genomes$node, to = .$genomes$genome)
+    .$tree
+  } %>%
+  ape::write.tree(file = "results/parsed/lgc_protein_rooted.tree")
 
 # write table with phylogroup membership of species
 species <-
