@@ -29,10 +29,10 @@ clusters_named %>%
 # read genome dataset 1 
 genomes_ds1 <- 
   readxl::read_xlsx(
-    "data/Table S1 Leuconostococaceae and Lactobacillaceae revised.xlsx"
+    "data/table_S1_corrected.xlsx"
   ) %>%
   transmute(
-    genome = str_c(Genus, Species, sep = " "), 
+    genome = `Species name`, 
     phylogroup = `proposed new genus name`,
     genus = Genus
   ) %>%
@@ -42,24 +42,10 @@ genomes_ds1 <-
   distinct() %>%
   mutate_at("genome", abbreviate_species)
 
-# read AAI values of genome dataset 1 
-aais_ds1 <- 
-  readxl::read_xlsx(
-    "data/Table S4 AAI_table_full_May 2019.xlsx",
-    range = readxl::cell_limits(c(2, 2), c(NA, NA))
-  ) %>%
-  rename(genome_1 = `...1`) %>%
-  gather(key = "genome_2", value = "aai", - genome_1) %>%
-  mutate_at("aai", as.numeric) %>%
-  mutate_at("aai", ~ . / 100) %>%
-  filter(! is.na(aai)) %>%
-  mutate_at(c("genome_1", "genome_2"), ~ str_extract(., "^[^ ]+ [^ .]+")) %>%
-  mutate_at(c("genome_1", "genome_2"), abbreviate_species) 
-
 # read cAAI values of genome dataset 1 
 caais_ds1 <- 
   readxl::read_xlsx(
-    "data/Table S3 cAAI_table_full_Aug 2019.xlsx",
+    "data/table_S3.xlsx",
     range = readxl::cell_limits(c(2, 2), c(NA, NA))
   ) %>%
   rename(genome_1 = `...1`) %>%
@@ -67,6 +53,20 @@ caais_ds1 <-
   mutate_at("caai", as.numeric) %>%
   mutate_at("caai", ~ . / 100) %>%
   filter(! is.na(caai)) %>%
+  mutate_at(c("genome_1", "genome_2"), ~ str_extract(., "^[^ ]+ [^ .]+")) %>%
+  mutate_at(c("genome_1", "genome_2"), abbreviate_species) 
+
+# read AAI values of genome dataset 1 
+aais_ds1 <- 
+  readxl::read_xlsx(
+    "data/table_S4.xlsx",
+    range = readxl::cell_limits(c(2, 2), c(NA, NA))
+  ) %>%
+  rename(genome_1 = `...1`) %>%
+  gather(key = "genome_2", value = "aai", - genome_1) %>%
+  mutate_at("aai", as.numeric) %>%
+  mutate_at("aai", ~ . / 100) %>%
+  filter(! is.na(aai)) %>%
   mutate_at(c("genome_1", "genome_2"), ~ str_extract(., "^[^ ]+ [^ .]+")) %>%
   mutate_at(c("genome_1", "genome_2"), abbreviate_species) 
 
@@ -84,8 +84,7 @@ genomes_ds1_all <-
 genomes_ds1_all%>%
   count(present_aai, present_caai, present_genomes)
 genomes_ds1_all %>%
-  filter(is.na(present_aai) | is.na(present_caai) | is.na(present_genomes)) %>%
-  View()
+  filter(is.na(present_aai) | is.na(present_caai) | is.na(present_genomes))
 
 # merge the AAI and cAAI tables
 genome_pairs_ds1 <- 

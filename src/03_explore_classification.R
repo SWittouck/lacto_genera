@@ -1,5 +1,5 @@
 # dependencies: R version 3.6.1, tidyverse version 1.2.1, tidygenomes version
-# 0.1.2, ggtree version 1.16.0
+# 9f2ceb8, ggtree version 1.16.0
 
 library(tidyverse)
 library(tidygenomes)

@@ -1,5 +1,6 @@
 # dependencies: R version 3.6.1, tidyverse version 1.2.1, tidygenomes version
-# 0.1.2, ggtree version 1.16.0, castor version 1.4.1 (for RED)
+# 0.1.2, ggtree version 1.16.0, castor version 1.4.1 (for RED), egg version
+# 0.4.5
 
 library(tidyverse)
 library(tidygenomes)
